@@ -1,13 +1,12 @@
 import asyncio
 from dataclasses import dataclass
-from typing import List, Dict, Callable
 import logging
 import random
 import time
 import datetime
 
-from sqlalchemy import Column, BigInteger, Text, DateTime, create_engine
-from sqlalchemy.orm import declarative_base, Session
+from sqlalchemy import Column, BigInteger, Text, DateTime
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
 
@@ -50,19 +49,19 @@ class AsyncPostgresClient:
         async with self._engine.begin() as conn:
             await conn.run_sync(declarative_base_class.metadata.create_all)
 
-    async def drop_and_create_all_tables(self):
-        await self.drop_all_tables()
-        await self.create_all_tables()
+    async def drop_and_create_all_tables(self, declarative_base_class):
+        await self.drop_all_tables(declarative_base_class)
+        await self.create_all_tables(declarative_base_class)
 
     async def process_new_session(self, session_id: str):
         print(f'Writing data to Postgres with session id: {session_id}...')
+        data_to_add = [Sessions(session_id=session_id, session_datetime=datetime.datetime.now()) for _ in range(1_000)]
         async with AsyncSession(self._engine) as session:
             async with session.begin():
                 session.add_all(
-                    [
-                        Sessions(session_id=session_id, session_datetime=datetime.datetime.now())
-                    ]
+                    data_to_add
                 )
+            await session.commit()
         print(f'[x] {session_id} data saved to DB')
 
     @staticmethod
@@ -80,7 +79,7 @@ async def main():
     async_postgres_client = AsyncPostgresClient.default_config_postgres_client()
 
     async_postgres_client.init()
-    async_postgres_client.create_all_tables(declarative_base_class=Base)
+    await async_postgres_client.drop_and_create_all_tables(declarative_base_class=Base)
 
     while True:
         print(f'{time.time()} Waiting for data...')
