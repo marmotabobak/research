@@ -5,9 +5,10 @@ import random
 import time
 import datetime
 
-from sqlalchemy import Column, BigInteger, Text, DateTime
+from sqlalchemy import Column, BigInteger, Text, DateTime, select
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 
 
 log = logging.getLogger(__name__)
@@ -54,15 +55,28 @@ class AsyncPostgresClient:
         await self.create_all_tables(declarative_base_class)
 
     async def process_new_session(self, session_id: str):
-        print(f'Writing data to Postgres with session id: {session_id}...')
-        data_to_add = [Sessions(session_id=session_id, session_datetime=datetime.datetime.now()) for _ in range(1_000)]
+        print(f'Checking session_id in database...')
         async with AsyncSession(self._engine) as session:
-            async with session.begin():
-                session.add_all(
-                    data_to_add
-                )
-            await session.commit()
-        print(f'[x] {session_id} data saved to DB')
+            result = await session.execute(select(Sessions).where(Sessions.session_id == session_id))
+            try:
+                result.scalars().one()
+                print('ONE FOUND')
+            except MultipleResultsFound:
+                print('MANY FOUND')
+            except NoResultFound:
+                print('NOT FOUND')
+                print(f'Writing data to Postgres with session id: {session_id}...')
+                data_to_add = [Sessions(session_id=session_id, session_datetime=datetime.datetime.now()) for _ in
+                               range(1_000)]
+                async with AsyncSession(self._engine) as session:
+                    async with session.begin():
+                        session.add_all(
+                            data_to_add
+                        )
+                    await session.commit()
+                print(f'[x] {session_id} data saved to DB')
+            except Exception:
+                raise
 
     @staticmethod
     def default_config_postgres_client():
@@ -83,10 +97,9 @@ async def main():
 
     while True:
         print(f'{time.time()} Waiting for data...')
-        session_id = random.randint(1, 100)
-        if session_id > 70:
-            print(f'[x] NEW SESSION: {session_id}')
-            asyncio.create_task(async_postgres_client.process_new_session(session_id=str(session_id)))
+        session_id = random.randint(1, 5)
+        print(f'[x] NEW SESSION: {session_id}')
+        asyncio.create_task(async_postgres_client.process_new_session(session_id=str(session_id)))
         await asyncio.sleep(0.5)
 
 
