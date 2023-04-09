@@ -5,7 +5,7 @@ import random
 import time
 import datetime
 
-from sqlalchemy import Column, BigInteger, Text, DateTime, select
+from sqlalchemy import Column, BigInteger, Text, DateTime, select, delete
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
@@ -59,15 +59,18 @@ class AsyncPostgresClient:
         async with AsyncSession(self._engine) as session:
             result = await session.execute(select(Sessions).where(Sessions.session_id == session_id))
             try:
-                result.scalars().one()
-                print('ONE FOUND')
+                print(f'ONE FOUND: {result.scalar_one().session_datetime} - deleting')
+                await session.execute(delete(Sessions).where(Sessions.session_id == session_id))
+                await session.commit()
             except MultipleResultsFound:
-                print('MANY FOUND')
+                print('MANY FOUND - deleting')
+                await session.execute(delete(Sessions).where(Sessions.session_id == session_id))
+                await session.commit()
             except NoResultFound:
                 print('NOT FOUND')
                 print(f'Writing data to Postgres with session id: {session_id}...')
                 data_to_add = [Sessions(session_id=session_id, session_datetime=datetime.datetime.now()) for _ in
-                               range(1_000)]
+                               range(2)]
                 async with AsyncSession(self._engine) as session:
                     async with session.begin():
                         session.add_all(
