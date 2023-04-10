@@ -78,30 +78,23 @@ def asyncio_process(cycles: int, pb, cpu_operations_per_cycle: int = None):
 
 if __name__ == '__main__':
 
+    functions = {
+        'Regular': regular_process,
+        'Threading': thread_process,
+        'Asyncio': asyncio_process
+    }
+
     print(f'\n--- CPU-bound ({CPU_CYCLES} cycles with)---')
 
-    progress_bar = tqdm.tqdm(desc='Regular', total=CPU_CYCLES)
-    regular_process(pb=progress_bar, cycles=CPU_CYCLES, cpu_operations_per_cycle=CPU_OPERATIONS_PER_CYCLE)
-    progress_bar.close()
+    for name, func in functions.items():
+        progress_bar = tqdm.tqdm(desc=name, total=CPU_CYCLES)
+        func(pb=progress_bar, cycles=CPU_CYCLES, cpu_operations_per_cycle=CPU_OPERATIONS_PER_CYCLE)
+        progress_bar.close()
 
-    progress_bar = tqdm.tqdm(desc='Threading', total=CPU_CYCLES)
-    thread_process(pb=progress_bar, cycles=CPU_CYCLES, cpu_operations_per_cycle=CPU_OPERATIONS_PER_CYCLE)
-    progress_bar.close()
-
-    progress_bar = tqdm.tqdm(desc='Asyncio', total=CPU_CYCLES)
-    asyncio_process(pb=progress_bar, cycles=CPU_CYCLES, cpu_operations_per_cycle=CPU_OPERATIONS_PER_CYCLE)
-    progress_bar.close()
 
     print(f'\n--- I/O-bound ({CPU_CYCLES} sleeps for ({1 / IO_CYCLES} sec.)) ---')
 
-    progress_bar = tqdm.tqdm(desc='Regular', total=IO_CYCLES)
-    regular_process(pb=progress_bar, cycles=IO_CYCLES)
-    progress_bar.close()
-
-    progress_bar = tqdm.tqdm(desc='Threading', total=IO_CYCLES)
-    thread_process(pb=progress_bar, cycles=IO_CYCLES)
-    progress_bar.close()
-
-    progress_bar = tqdm.tqdm(desc='Asyncio', total=IO_CYCLES)
-    asyncio_process(pb=progress_bar, cycles=IO_CYCLES)
-    progress_bar.close()
+    for name, func in functions.items():
+        progress_bar = tqdm.tqdm(desc=name, total=IO_CYCLES)
+        func(pb=progress_bar, cycles=IO_CYCLES)
+        progress_bar.close()
