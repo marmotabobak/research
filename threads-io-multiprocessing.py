@@ -30,20 +30,6 @@ def task_cpu_or_sleep(pb, cpu_operations: int = None, time_to_sleep: float = Non
     pb.update(1)
 
 
-async def coro_cpu_or_sleep(pb, cpu_operations: int = None):
-    pb.update(1)
-    if cpu_operations:
-        for _ in range(cpu_operations):
-            pass
-    else:
-        await asyncio.sleep(0.1)
-
-
-async def asyncio_main(cn, pb, cpu_operations_per_cycle: int = None):
-    for _ in range(cn):
-        asyncio.create_task(coro_cpu_or_sleep(pb=pb, cpu_operations=cpu_operations_per_cycle))
-
-
 @count_time
 def regular_process(pb, cycles: int, cpu_operations_per_cycle: int = None) -> None:
     kwargs = {'pb': pb}
@@ -71,30 +57,52 @@ def thread_process(pb, cycles: int, cpu_operations_per_cycle: int = None):
         thread.join()
 
 
+async def coro_cpu_or_sleep(pb, cpu_operations: int = None, time_to_sleep: int = None):
+    pb.update(1)
+    if cpu_operations:
+        for _ in range(cpu_operations):
+            pass
+    else:
+        await asyncio.sleep(time_to_sleep)
+
+
+async def asyncio_main(pb, cn, cpu_operations_per_cycle: int = None):
+    kwargs = {'pb': pb}
+    if cpu_operations_per_cycle:
+        kwargs['cpu_operations'] = cpu_operations_per_cycle
+    else:
+        kwargs['time_to_sleep'] = 1 / cn
+    for _ in range(cn):
+        asyncio.create_task(coro_cpu_or_sleep(**kwargs))
+
+
 @count_time
 def asyncio_process(cycles: int, pb, cpu_operations_per_cycle: int = None):
     asyncio.run(asyncio_main(cn=cycles, pb=pb, cpu_operations_per_cycle=cpu_operations_per_cycle))
 
 
-if __name__ == '__main__':
-
+def run_all(title: str, cycles: int, cpu_operations_per_cycle: int = None):
     functions = {
         'Regular': regular_process,
         'Threading': thread_process,
         'Asyncio': asyncio_process
     }
-
-    print(f'\n--- CPU-bound ({CPU_CYCLES} cycles with)---')
-
+    print(title)
     for name, func in functions.items():
-        progress_bar = tqdm.tqdm(desc=name, total=CPU_CYCLES)
-        func(pb=progress_bar, cycles=CPU_CYCLES, cpu_operations_per_cycle=CPU_OPERATIONS_PER_CYCLE)
+        progress_bar = tqdm.tqdm(desc=name, total=cycles)
+        func(pb=progress_bar, cycles=cycles, cpu_operations_per_cycle=cpu_operations_per_cycle)
         progress_bar.close()
 
 
-    print(f'\n--- I/O-bound ({CPU_CYCLES} sleeps for ({1 / IO_CYCLES} sec.)) ---')
+if __name__ == '__main__':
 
-    for name, func in functions.items():
-        progress_bar = tqdm.tqdm(desc=name, total=IO_CYCLES)
-        func(pb=progress_bar, cycles=IO_CYCLES)
-        progress_bar.close()
+    run_all(
+        title=f'\n--- CPU-bound ({CPU_CYCLES} cycles with)---',
+        cycles=CPU_CYCLES,
+        cpu_operations_per_cycle=CPU_OPERATIONS_PER_CYCLE
+    )
+
+    run_all(
+        title=f'\n--- I/O-bound ({CPU_CYCLES} sleeps for ({1 / IO_CYCLES} sec.)) ---',
+        cycles=IO_CYCLES
+    )
